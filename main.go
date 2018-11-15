@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/optiopay/klar/clair"
-	"github.com/optiopay/klar/docker"
+	"github.com/sriddell/klar/clair"
+	"github.com/sriddell/klar/docker"
 )
 
 var store = make(map[string][]*clair.Vulnerability)

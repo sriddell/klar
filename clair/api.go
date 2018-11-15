@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/coreos/clair/api/v3/clairpb"
-	"github.com/optiopay/klar/docker"
-	"github.com/optiopay/klar/utils"
+	"github.com/sriddell/klar/docker"
+	"github.com/sriddell/klar/utils"
 	"google.golang.org/grpc"
 )
 
