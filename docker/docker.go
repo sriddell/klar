@@ -36,6 +36,10 @@ type Image struct {
 	schemaVersion int
 }
 
+func (i *Image) Digest() string {
+	return i.digest
+}
+
 func (i *Image) LayerName(index int) string {
 	s := fmt.Sprintf("%s%s", trimDigest(i.digest),
 		trimDigest(i.FsLayers[index].BlobSum))
@@ -236,6 +240,10 @@ func (i *Image) Pull() error {
 }
 
 func parseImageResponse(resp *http.Response, image *Image) error {
+	fail := func(format string, a ...interface{}) {
+		fmt.Fprintf(os.Stderr, fmt.Sprintf("%s\n", format), a...)
+		os.Exit(2)
+	}
 	contentType := resp.Header.Get("Content-Type")
 	if contentType == "application/vnd.docker.distribution.manifest.v2+json" {
 		var imageV2 imageV2
@@ -249,19 +257,11 @@ func parseImageResponse(resp *http.Response, image *Image) error {
 		}
 		image.digest = imageV2.Config.Digest
 		image.schemaVersion = imageV2.SchemaVersion
+		if image.schemaVersion == 1 {
+			fail("Image schema version is 1; please repush the image so that is is stored a version 2 so the image digest is available")
+		}
 	} else {
-		var imageV1 imageV1
-		if err := json.NewDecoder(resp.Body).Decode(&imageV1); err != nil {
-			fmt.Fprintln(os.Stderr, "ImageV1 decode error")
-			return err
-		}
-		image.FsLayers = make([]FsLayer, len(imageV1.FsLayers))
-		// in schemaVersion 1 layers are in reverse order, so we save them in the same order as v2
-		// base layer is the first
-		for i := range imageV1.FsLayers {
-			image.FsLayers[len(imageV1.FsLayers)-1-i].BlobSum = imageV1.FsLayers[i].BlobSum
-		}
-		image.schemaVersion = imageV1.SchemaVersion
+		fail("Can only operate with images that have application/vnd.docker.distribution.manifest.v2+json manifests; please repush the image so that it is stored in the newer format")
 	}
 	return nil
 }

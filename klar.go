@@ -2,16 +2,16 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
 	"time"
-	"io/ioutil"
 
 	"github.com/optiopay/klar/clair"
 	"github.com/optiopay/klar/docker"
 	"github.com/optiopay/klar/utils"
-	
+
 	"gopkg.in/yaml.v2"
 )
 
@@ -19,7 +19,7 @@ import (
 type vulnerabilitiesWhitelistYAML struct {
 	General []string
 	Images  map[string][]string
-}	
+}
 
 //Map structure used for ease of searching for whitelisted vulnerabilites
 type vulnerabilitiesWhitelist struct {
@@ -85,8 +85,10 @@ func parseBoolOption(key string) bool {
 }
 
 type jsonOutput struct {
-	LayerCount      int
-	Vulnerabilities map[string][]*clair.Vulnerability
+	LayerCount        int
+	Vulnerabilities   map[string][]*clair.Vulnerability
+	AnalyzedImageName string
+	ImageDigest       string
 }
 
 type config struct {
@@ -149,7 +151,7 @@ func newConfig(args []string) (*config, error) {
 func parseWhitelistFile(whitelistFile string) (*vulnerabilitiesWhitelist, error) {
 	whitelistYAML := vulnerabilitiesWhitelistYAML{}
 	whitelist := vulnerabilitiesWhitelist{}
-	
+
 	//read the whitelist file
 	whitelistBytes, err := ioutil.ReadFile(whitelistFile)
 	if err != nil {
@@ -158,22 +160,22 @@ func parseWhitelistFile(whitelistFile string) (*vulnerabilitiesWhitelist, error)
 	if err = yaml.Unmarshal(whitelistBytes, &whitelistYAML); err != nil {
 		return nil, fmt.Errorf("could not unmarshal %v", err)
 	}
-	
+
 	//Initialize the whitelist maps
 	whitelist.General = make(map[string]bool)
 	whitelist.Images = make(map[string]map[string]bool)
-	
+
 	//Populate the maps
-	for _,cve := range whitelistYAML.General {
+	for _, cve := range whitelistYAML.General {
 		whitelist.General[cve] = true
 	}
-	
-	for image,cveList := range whitelistYAML.Images {
+
+	for image, cveList := range whitelistYAML.Images {
 		whitelist.Images[image] = make(map[string]bool)
-		for _,cve := range cveList {
+		for _, cve := range cveList {
 			whitelist.Images[image][cve] = true
 		}
 	}
-	
+
 	return &whitelist, nil
 }

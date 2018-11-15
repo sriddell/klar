@@ -95,6 +95,8 @@ func main() {
 	vsNumber := 0
 
 	if conf.JSONOutput {
+		output.AnalyzedImageName = image.AnalyzedLayerName()
+		output.ImageDigest = image.Digest()
 		iteratePriorities(conf.ClairOutput, func(sev string) {
 			if conf.IgnoreUnfixed {
 				// need to iterate over store[sev]
@@ -111,6 +113,8 @@ func main() {
 		enc := json.NewEncoder(os.Stdout)
 		enc.Encode(output)
 	} else {
+		fmt.Printf("Queried Clair for vulnerabilites for layer name %s\n", image.AnalyzedLayerName())
+		fmt.Printf("Image digest: %s\n", image.Digest())
 		if numVulnerabilitiesAfterWhitelist < numVulnerabilites {
 			//display how many vulnerabilities were whitelisted
 			fmt.Printf("Whitelisted %d vulnerabilities\n", numVulnerabilites-numVulnerabilitiesAfterWhitelist)
@@ -121,8 +125,8 @@ func main() {
 
 		iteratePriorities(conf.ClairOutput, func(sev string) {
 			for _, v := range store[sev] {
-				fmt.Printf("%s: [%s] \nFound in: %s [%s]\nFixed By: %s\n%s\n%s\n", v.Name, v.Severity, v.FeatureName, 
-v.FeatureVersion, v.FixedBy, v.Description, v.Link)
+				fmt.Printf("%s: [%s] \nFound in: %s [%s]\nFixed By: %s\n%s\n%s\n", v.Name, v.Severity, v.FeatureName,
+					v.FeatureVersion, v.FixedBy, v.Description, v.Link)
 				fmt.Println("-----------------------------------------")
 				if conf.IgnoreUnfixed {
 					if v.FixedBy != "" {
@@ -192,4 +196,3 @@ func filterWhitelist(whitelist *vulnerabilitiesWhitelist, vs []*clair.Vulnerabil
 
 	return filteredVs
 }
-
