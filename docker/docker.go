@@ -206,6 +206,7 @@ func NewImage(conf *Config) (*Image, error) {
 func (i *Image) Pull() error {
 	// This fork of klar is designed specifically for integration with ECR and should only be used to process images identified by digest.
 	// We will pre-check that the image Tag is a digest
+	fmt.Fprintln(os.Stdout, i.Tag)
 	if !strings.HasPrefix("sha256:", i.Tag) {
 		return errors.New("this fork of klar only accepts image digests as identifiers, not tags")
 	}
