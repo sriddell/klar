@@ -33,13 +33,8 @@ type Image struct {
 	user          string
 	password      string
 	client        http.Client
-	digest        string
 	schemaVersion int
 	registryID    string
-}
-
-func (i *Image) Digest() string {
-	return i.digest
 }
 
 func (i *Image) LayerName(index int) string {
@@ -201,13 +196,13 @@ func NewImage(conf *Config) (*Image, error) {
 	registryID = strings.Split(registryID, ".")[0]
 
 	return &Image{
-		Registry: registry,
-		Name:     name,
-		Tag:      tag,
-		user:     conf.User,
-		password: conf.Password,
-		Token:    token,
-		client:   client,
+		Registry:   registry,
+		Name:       name,
+		Tag:        tag,
+		user:       conf.User,
+		password:   conf.Password,
+		Token:      token,
+		client:     client,
 		registryID: registryID,
 	}, nil
 }
@@ -270,7 +265,6 @@ func parseImageResponse(resp *http.Response, image *Image) error {
 		for i := range imageV2.Layers {
 			image.FsLayers[i].BlobSum = imageV2.Layers[i].Digest
 		}
-		image.digest = imageV2.Config.Digest
 		image.schemaVersion = imageV2.SchemaVersion
 	} else {
 		fmt.Fprintln(os.Stdout, "Processing a v1 manifest for "+image.Name+" "+image.Tag)
@@ -287,8 +281,6 @@ func parseImageResponse(resp *http.Response, image *Image) error {
 		}
 		image.schemaVersion = imageV1.SchemaVersion
 	}
-	fmt.Println("registry digest is " + image.Tag)
-	fmt.Println("image digest is" + image.Digest())
 	return nil
 }
 
