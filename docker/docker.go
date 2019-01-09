@@ -273,6 +273,7 @@ func parseImageResponse(resp *http.Response, image *Image) error {
 		image.digest = imageV2.Config.Digest
 		image.schemaVersion = imageV2.SchemaVersion
 	} else {
+		fmt.Fprintln(os.Stdout, "Processing a v1 manifest for " + image.Name + " " + image.Tag)
 		var imageV1 imageV1
 		if err := json.NewDecoder(resp.Body).Decode(&imageV1); err != nil {
 			fmt.Fprintln(os.Stderr, "ImageV1 decode error")
