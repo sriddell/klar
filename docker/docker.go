@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -42,9 +43,10 @@ func (i *Image) LayerName(index int) string {
 	// 	trimDigest(i.FsLayers[index].BlobSum))
 	//Note that this fork requires the Tag to be an ImageDigest sha in the target registry,
 	//so using Tag here is safe
-	s := fmt.Sprintf("%s:%s:%s:%s", i.registryID, i.Name, trimDigest(i.Tag), trimDigest(i.FsLayers[index].BlobSum))
-	fmt.Println("LayerName " + s)
-	return s
+	qualified := fmt.Sprintf("%s:%s:%s:%s", i.registryID, i.Name, trimDigest(i.Tag), trimDigest(i.FsLayers[index].BlobSum))
+	hashdigest := fmt.Sprintf("%x", sha256.Sum256([]byte(qualified)))
+	fmt.Println("LayerName " + hashdigest)
+	return hashdigest
 }
 
 func (i *Image) AnalyzedLayerName() string {

@@ -86,6 +86,7 @@ func parseBoolOption(key string) bool {
 
 type jsonOutput struct {
 	LayerCount        int
+	LayerNames        []string
 	Vulnerabilities   map[string][]*clair.Vulnerability
 	AnalyzedImageName string
 	ImageDigest       string

@@ -57,6 +57,7 @@ func main() {
 
 	output := jsonOutput{
 		Vulnerabilities: make(map[string][]*clair.Vulnerability),
+		LayerNames: []string{},
 	}
 
 	if len(image.FsLayers) == 0 {
@@ -64,6 +65,9 @@ func main() {
 	} else {
 		if conf.JSONOutput {
 			output.LayerCount = len(image.FsLayers)
+			for index := range image.FsLayers {
+				output.LayerNames = append(output.LayerNames, image.LayerName(index))
+			}
 		} else {
 			fmt.Printf("Analysing %d layers\n", len(image.FsLayers))
 		}
