@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"errors"
 
 	"github.com/sriddell/klar/utils"
 )
@@ -35,6 +36,7 @@ type Image struct {
 	digest        string
 	schemaVersion int
 }
+
 
 func (i *Image) Digest() string {
 	return i.digest
@@ -202,7 +204,13 @@ func NewImage(conf *Config) (*Image, error) {
 // Pull retrieves information about layers from docker registry.
 // It gets docker registry token if needed.
 func (i *Image) Pull() error {
+	// This fork of klar is designed specifically for integration with ECR and should only be used to process images identified by digest.
+	// We will pre-check that the image Tag is a digest
+	if !strings.HasPrefix("sha256:", i.Tag) {
+		return errors.New("this fork of klar only accepts image digests as identifiers, not tags")
+	}
 	resp, err := i.pullReq()
+	originalDigest := i.Tag
 	if err != nil {
 		return err
 	}
@@ -236,14 +244,21 @@ func (i *Image) Pull() error {
 			defer resp.Body.Close()
 		}
 	}
-	return parseImageResponse(resp, i)
+	err = parseImageResponse(resp, i)
+	if err != nil {
+		return err
+	}
+	if len(i.Digest()) == 0 {
+		// we hit a v1 schema without a digest, any input should be as a digest, so we can pull it from the tag
+		i.digest = i.Tag
+	}
+	if originalDigest != i.digest {
+		return errors.New("digest retrieved via manifest does not match input digest")
+	}
+	return err
 }
 
 func parseImageResponse(resp *http.Response, image *Image) error {
-	fail := func(format string, a ...interface{}) {
-		fmt.Fprintf(os.Stderr, fmt.Sprintf("%s\n", format), a...)
-		os.Exit(2)
-	}
 	contentType := resp.Header.Get("Content-Type")
 	if contentType == "application/vnd.docker.distribution.manifest.v2+json" {
 		var imageV2 imageV2
@@ -257,11 +272,19 @@ func parseImageResponse(resp *http.Response, image *Image) error {
 		}
 		image.digest = imageV2.Config.Digest
 		image.schemaVersion = imageV2.SchemaVersion
-		if image.schemaVersion == 1 {
-			fail("Image schema version is 1; please repush the image so that is is stored a version 2 so the image digest is available")
-		}
 	} else {
-		fail("Can only operate with images that have application/vnd.docker.distribution.manifest.v2+json manifests; please repush the image so that it is stored in the newer format")
+		var imageV1 imageV1
+		if err := json.NewDecoder(resp.Body).Decode(&imageV1); err != nil {
+			fmt.Fprintln(os.Stderr, "ImageV1 decode error")
+			return err
+		}
+		image.FsLayers = make([]FsLayer, len(imageV1.FsLayers))
+		// in schemaVersion 1 layers are in reverse order, so we save them in the same order as v2
+		// base layer is the first
+		for i := range imageV1.FsLayers {
+			image.FsLayers[len(imageV1.FsLayers)-1-i].BlobSum = imageV1.FsLayers[i].BlobSum
+		}
+		image.schemaVersion = imageV1.SchemaVersion
 	}
 	return nil
 }
