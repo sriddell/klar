@@ -3,6 +3,7 @@ package docker
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,7 +12,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"errors"
 
 	"github.com/sriddell/klar/utils"
 )
@@ -35,16 +35,20 @@ type Image struct {
 	client        http.Client
 	digest        string
 	schemaVersion int
+	registryID    string
 }
-
 
 func (i *Image) Digest() string {
 	return i.digest
 }
 
 func (i *Image) LayerName(index int) string {
-	s := fmt.Sprintf("%s%s", trimDigest(i.digest),
-		trimDigest(i.FsLayers[index].BlobSum))
+	// s := fmt.Sprintf("%s%s", trimDigest(i.digest),
+	// 	trimDigest(i.FsLayers[index].BlobSum))
+	//Note that this fork requires the Tag to be an ImageDigest sha in the target registry,
+	//so using Tag here is safe
+	s := fmt.Sprintf("%s:%s:%s:%s", i.registryID, i.Name, trimDigest(i.Tag), trimDigest(i.FsLayers[index].BlobSum))
+	fmt.Println("LayerName " + s)
 	return s
 }
 
@@ -190,6 +194,12 @@ func NewImage(conf *Config) (*Image, error) {
 		token = "Basic " + conf.Token
 	}
 
+	// we need to extract the registry ID from the registry url
+	registryID := registry
+	registryID = strings.TrimPrefix(registryID, "http://")
+	registryID = strings.TrimPrefix(registryID, "https://")
+	registryID = strings.Split(registryID, ".")[0]
+
 	return &Image{
 		Registry: registry,
 		Name:     name,
@@ -198,6 +208,7 @@ func NewImage(conf *Config) (*Image, error) {
 		password: conf.Password,
 		Token:    token,
 		client:   client,
+		registryID: registryID,
 	}, nil
 }
 
@@ -206,12 +217,11 @@ func NewImage(conf *Config) (*Image, error) {
 func (i *Image) Pull() error {
 	// This fork of klar is designed specifically for integration with ECR and should only be used to process images identified by digest.
 	// We will pre-check that the image Tag is a digest
-	fmt.Fprintln(os.Stdout, i.Tag)
-	if !strings.HasPrefix("sha256:", i.Tag) {
+	fmt.Fprintln(os.Stdout, i.Registry)
+	if !strings.HasPrefix(i.Tag, "sha256:") {
 		return errors.New("this fork of klar only accepts image digests as identifiers, not tags")
 	}
 	resp, err := i.pullReq()
-	originalDigest := i.Tag
 	if err != nil {
 		return err
 	}
@@ -245,18 +255,7 @@ func (i *Image) Pull() error {
 			defer resp.Body.Close()
 		}
 	}
-	err = parseImageResponse(resp, i)
-	if err != nil {
-		return err
-	}
-	if len(i.Digest()) == 0 {
-		// we hit a v1 schema without a digest, any input should be as a digest, so we can pull it from the tag
-		i.digest = i.Tag
-	}
-	if originalDigest != i.digest {
-		return errors.New("digest retrieved via manifest does not match input digest")
-	}
-	return err
+	return parseImageResponse(resp, i)
 }
 
 func parseImageResponse(resp *http.Response, image *Image) error {
@@ -274,7 +273,7 @@ func parseImageResponse(resp *http.Response, image *Image) error {
 		image.digest = imageV2.Config.Digest
 		image.schemaVersion = imageV2.SchemaVersion
 	} else {
-		fmt.Fprintln(os.Stdout, "Processing a v1 manifest for " + image.Name + " " + image.Tag)
+		fmt.Fprintln(os.Stdout, "Processing a v1 manifest for "+image.Name+" "+image.Tag)
 		var imageV1 imageV1
 		if err := json.NewDecoder(resp.Body).Decode(&imageV1); err != nil {
 			fmt.Fprintln(os.Stderr, "ImageV1 decode error")
@@ -288,6 +287,8 @@ func parseImageResponse(resp *http.Response, image *Image) error {
 		}
 		image.schemaVersion = imageV1.SchemaVersion
 	}
+	fmt.Println("registry digest is " + image.Tag)
+	fmt.Println("image digest is" + image.Digest())
 	return nil
 }
 
