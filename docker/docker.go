@@ -45,7 +45,6 @@ func (i *Image) LayerName(index int) string {
 	//so using Tag here is safe
 	qualified := fmt.Sprintf("%s:%s:%s:%s", i.registryID, i.Name, trimDigest(i.Tag), trimDigest(i.FsLayers[index].BlobSum))
 	hashdigest := fmt.Sprintf("%x", sha256.Sum256([]byte(qualified)))
-	fmt.Println("LayerName " + hashdigest)
 	return hashdigest
 }
 
@@ -214,7 +213,6 @@ func NewImage(conf *Config) (*Image, error) {
 func (i *Image) Pull() error {
 	// This fork of klar is designed specifically for integration with ECR and should only be used to process images identified by digest.
 	// We will pre-check that the image Tag is a digest
-	fmt.Fprintln(os.Stdout, i.Registry)
 	if !strings.HasPrefix(i.Tag, "sha256:") {
 		return errors.New("this fork of klar only accepts image digests as identifiers, not tags")
 	}
@@ -269,7 +267,6 @@ func parseImageResponse(resp *http.Response, image *Image) error {
 		}
 		image.schemaVersion = imageV2.SchemaVersion
 	} else {
-		fmt.Fprintln(os.Stdout, "Processing a v1 manifest for "+image.Name+" "+image.Tag)
 		var imageV1 imageV1
 		if err := json.NewDecoder(resp.Body).Decode(&imageV1); err != nil {
 			fmt.Fprintln(os.Stderr, "ImageV1 decode error")
