@@ -291,7 +291,7 @@ func (i *Image) requestToken(resp *http.Response) (string, error) {
 	parts := tokenRe.FindStringSubmatch(authHeader)
 	if parts == nil {
 		return "", fmt.Errorf("Can't parse Www-Authenticate: %s", authHeader)
-	}
+	}                                          
 	realm, service, scope := parts[1], parts[2], parts[3]
 	var url string
 	if i.user != "" {

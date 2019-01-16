@@ -87,6 +87,7 @@ func (a *apiV1) pushLayer(layer *layer) error {
 		return fmt.Errorf("can't create a push request: %s", err)
 	}
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Connection", "close")
 	utils.DumpRequest(request)
 	response, err := a.client.Do(request)
 	if err != nil {
@@ -115,6 +116,7 @@ func (a *apiV1) Analyze(image *docker.Image) ([]*Vulnerability, error) {
 	if err != nil {
 		return nil, fmt.Errorf("can't create an analyze request: %s", err)
 	}
+	request.Header.Set("Connection", "close")
 	utils.DumpRequest(request)
 	response, err := a.client.Do(request)
 	if err != nil {
