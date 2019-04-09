@@ -60,6 +60,7 @@ Usage:
     CLAIR_ADDR=localhost CLAIR_OUTPUT=High CLAIR_THRESHOLD=10 DOCKER_USER=docker DOCKER_PASSWORD=secret klar postgres:9.5.1
 
 ### Debug Output
+
 You can enable more verbose output but setting `KLAR_TRACE` to true.
 * run `export KLAR_TRACE=true` to persist between runs.
 
@@ -107,3 +108,7 @@ With Docker:
 
     DOCKER_USER=oauth2accesstoken
     DOCKER_PASSWORD="$(docker run --rm google/cloud-sdk:alpine gcloud auth application-default print-access-token)"
+
+## Modification in this fork
+
+This fork was modified to provide a new layer naming scheme based on the layers ID in the registry, guaranteeing a unique layer name for both V1 and V2 schema.  It has also been modified to restrict input to only accept sha256 hedigest identifiers, as it is specifically designed for use within the [ecr-cve-monitor](https://github.com/sriddell/ecr-cve-monitor) project.

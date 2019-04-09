@@ -1,4 +1,8 @@
-Copyright (c) 2016 Optiopay GmbH
+Copyright for the original implementation of this project (klar) are held by Optiopay GmbH, 2016 (https://github.com/optiopay/klar).
+
+Copyright to custom modifications in this fork of the project are held by Shane Riddell, 2019
+
+Copyright (c) 202019 Shane Riddell
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
