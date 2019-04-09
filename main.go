@@ -57,6 +57,7 @@ func main() {
 
 	output := jsonOutput{
 		Vulnerabilities: make(map[string][]*clair.Vulnerability),
+		LayerNames: []string{},
 	}
 
 	if len(image.FsLayers) == 0 {
@@ -64,6 +65,9 @@ func main() {
 	} else {
 		if conf.JSONOutput {
 			output.LayerCount = len(image.FsLayers)
+			for index := range image.FsLayers {
+				output.LayerNames = append(output.LayerNames, image.LayerName(index))
+			}
 		} else {
 			fmt.Printf("Analysing %d layers\n", len(image.FsLayers))
 		}
@@ -96,7 +100,6 @@ func main() {
 
 	if conf.JSONOutput {
 		output.AnalyzedImageName = image.AnalyzedLayerName()
-		output.ImageDigest = image.Digest()
 		iteratePriorities(conf.ClairOutput, func(sev string) {
 			if conf.IgnoreUnfixed {
 				// need to iterate over store[sev]
@@ -114,7 +117,6 @@ func main() {
 		enc.Encode(output)
 	} else {
 		fmt.Printf("Queried Clair for vulnerabilites for layer name %s\n", image.AnalyzedLayerName())
-		fmt.Printf("Image digest: %s\n", image.Digest())
 		if numVulnerabilitiesAfterWhitelist < numVulnerabilites {
 			//display how many vulnerabilities were whitelisted
 			fmt.Printf("Whitelisted %d vulnerabilities\n", numVulnerabilites-numVulnerabilitiesAfterWhitelist)

@@ -5,6 +5,14 @@ Klar is a simple tool to analyze images stored in a private or public  Docker re
 
 Klar serves as a client which coordinates the image checks between the Docker registry and Clair.
 
+## Modifications
+
+This version is based on the original https://github.com/optiopay/klar project, with several modification to make it more friendly and specific to using with AWS ECR.
+
+* designed for use only with AWS ECR
+* expects that the image tag is a digest
+* generates all layer names based on the image tag (digest).  This ensures consistent layer naming across both v1 and v2 schemas.
+
 ## Binary installation
 
 The simplest way is to download the latest release (for OSX and Linux) from https://github.com/sriddell/klar/releases/ and put the binary in a folder in your `PATH` (make sure it has execute permission).
@@ -18,7 +26,6 @@ Then run
     go get github.com/sriddell/klar
 
 make sure your Go binary folder is in your `PATH` (e.g. `export PATH=$PATH:/usr/local/go/bin`)
-
 
 ## Usage
 
@@ -97,18 +104,10 @@ There is no permanent username/password for Amazon ECR, the credentials must be 
     PASSWORD=`echo $DOCKER_LOGIN | cut -d' ' -f6`
     REGISTRY=`echo $DOCKER_LOGIN | cut -d' ' -f9 | sed "s/https:\/\///"`
     DOCKER_USER=AWS DOCKER_PASSWORD=${PASSWORD} ./klar ${REGISTRY}/my-image
-
-## Google GCR support
-For authentication against GCR (Google Cloud Registry), the easiest way is to use the [application default credentials](https://developers.google.com/identity/protocols/application-default-credentials). These only work when running Klar from GCP. The only requirement is the Google Cloud SDK.
-
-    DOCKER_USER=oauth2accesstoken
-    DOCKER_PASSWORD="$(gcloud auth application-default print-access-token)"
-
-With Docker:
-
     DOCKER_USER=oauth2accesstoken
     DOCKER_PASSWORD="$(docker run --rm google/cloud-sdk:alpine gcloud auth application-default print-access-token)"
 
 ## Modification in this fork
 
 This fork was modified to provide a new layer naming scheme based on the layers ID in the registry, guaranteeing a unique layer name for both V1 and V2 schema.  It has also been modified to restrict input to only accept sha256 hedigest identifiers, as it is specifically designed for use within the [ecr-cve-monitor](https://github.com/sriddell/ecr-cve-monitor) project.
+

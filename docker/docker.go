@@ -1,8 +1,10 @@
 package docker
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,18 +34,18 @@ type Image struct {
 	user          string
 	password      string
 	client        http.Client
-	digest        string
 	schemaVersion int
-}
-
-func (i *Image) Digest() string {
-	return i.digest
+	registryID    string
 }
 
 func (i *Image) LayerName(index int) string {
-	s := fmt.Sprintf("%s%s", trimDigest(i.digest),
-		trimDigest(i.FsLayers[index].BlobSum))
-	return s
+	// s := fmt.Sprintf("%s%s", trimDigest(i.digest),
+	// 	trimDigest(i.FsLayers[index].BlobSum))
+	//Note that this fork requires the Tag to be an ImageDigest sha in the target registry,
+	//so using Tag here is safe
+	qualified := fmt.Sprintf("%s:%s:%s:%s", i.registryID, i.Name, trimDigest(i.Tag), trimDigest(i.FsLayers[index].BlobSum))
+	hashdigest := fmt.Sprintf("%x", sha256.Sum256([]byte(qualified)))
+	return hashdigest
 }
 
 func (i *Image) AnalyzedLayerName() string {
@@ -188,20 +190,32 @@ func NewImage(conf *Config) (*Image, error) {
 		token = "Basic " + conf.Token
 	}
 
+	// we need to extract the registry ID from the registry url
+	registryID := registry
+	registryID = strings.TrimPrefix(registryID, "http://")
+	registryID = strings.TrimPrefix(registryID, "https://")
+	registryID = strings.Split(registryID, ".")[0]
+
 	return &Image{
-		Registry: registry,
-		Name:     name,
-		Tag:      tag,
-		user:     conf.User,
-		password: conf.Password,
-		Token:    token,
-		client:   client,
+		Registry:   registry,
+		Name:       name,
+		Tag:        tag,
+		user:       conf.User,
+		password:   conf.Password,
+		Token:      token,
+		client:     client,
+		registryID: registryID,
 	}, nil
 }
 
 // Pull retrieves information about layers from docker registry.
 // It gets docker registry token if needed.
 func (i *Image) Pull() error {
+	// This fork of klar is designed specifically for integration with ECR and should only be used to process images identified by digest.
+	// We will pre-check that the image Tag is a digest
+	if !strings.HasPrefix(i.Tag, "sha256:") {
+		return errors.New("this fork of klar only accepts image digests as identifiers, not tags")
+	}
 	resp, err := i.pullReq()
 	if err != nil {
 		return err
@@ -240,10 +254,6 @@ func (i *Image) Pull() error {
 }
 
 func parseImageResponse(resp *http.Response, image *Image) error {
-	fail := func(format string, a ...interface{}) {
-		fmt.Fprintf(os.Stderr, fmt.Sprintf("%s\n", format), a...)
-		os.Exit(2)
-	}
 	contentType := resp.Header.Get("Content-Type")
 	if contentType == "application/vnd.docker.distribution.manifest.v2+json" {
 		var imageV2 imageV2
@@ -255,13 +265,20 @@ func parseImageResponse(resp *http.Response, image *Image) error {
 		for i := range imageV2.Layers {
 			image.FsLayers[i].BlobSum = imageV2.Layers[i].Digest
 		}
-		image.digest = imageV2.Config.Digest
 		image.schemaVersion = imageV2.SchemaVersion
-		if image.schemaVersion == 1 {
-			fail("Image schema version is 1; please repush the image so that is is stored a version 2 so the image digest is available")
-		}
 	} else {
-		fail("Can only operate with images that have application/vnd.docker.distribution.manifest.v2+json manifests; please repush the image so that it is stored in the newer format")
+		var imageV1 imageV1
+		if err := json.NewDecoder(resp.Body).Decode(&imageV1); err != nil {
+			fmt.Fprintln(os.Stderr, "ImageV1 decode error")
+			return err
+		}
+		image.FsLayers = make([]FsLayer, len(imageV1.FsLayers))
+		// in schemaVersion 1 layers are in reverse order, so we save them in the same order as v2
+		// base layer is the first
+		for i := range imageV1.FsLayers {
+			image.FsLayers[len(imageV1.FsLayers)-1-i].BlobSum = imageV1.FsLayers[i].BlobSum
+		}
+		image.schemaVersion = imageV1.SchemaVersion
 	}
 	return nil
 }
@@ -274,7 +291,7 @@ func (i *Image) requestToken(resp *http.Response) (string, error) {
 	parts := tokenRe.FindStringSubmatch(authHeader)
 	if parts == nil {
 		return "", fmt.Errorf("Can't parse Www-Authenticate: %s", authHeader)
-	}
+	}                                          
 	realm, service, scope := parts[1], parts[2], parts[3]
 	var url string
 	if i.user != "" {
